@@ -27,10 +27,27 @@ tmux kill-session -t claude-writer 2>/dev/null
 # Create session with just Claude
 tmux new-session -d -s claude-writer "$CLAUDE_PANE_SH"
 
-# Enable scrolling
+# Enable scrolling and copy/paste
 tmux set-option -t claude-writer mouse on
 tmux set-option -t claude-writer history-limit 10000
 tmux set-option -t claude-writer terminal-overrides 'xterm*:smcup@:rmcup@'
+
+# Disable right-click menu (prevents accidental kills)
+tmux unbind-key -n MouseDown3Pane
+tmux unbind-key -n M-MouseDown3Pane
+
+# Disable dangerous keybindings (prevent accidental session kill)
+tmux unbind-key &
+tmux unbind-key x
+tmux unbind-key X
+
+# Copy mode: select with mouse, copy to system clipboard
+tmux set-option -t claude-writer set-clipboard on
+tmux set-option -t claude-writer mode-keys vi
+tmux bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "xclip -selection clipboard 2>/dev/null || xsel --clipboard 2>/dev/null"
+
+# Ctrl+Shift+V to paste from system clipboard (Ctrl+V is taken by Claude)
+tmux bind-key -n C-v run-shell "xclip -selection clipboard -o 2>/dev/null | tmux load-buffer - && tmux paste-buffer"
 
 # Configure status bar as the menu (bottom of screen - away from Claude's logo)
 tmux set-option -t claude-writer status on
