@@ -27,9 +27,10 @@ tmux kill-session -t claude-writer 2>/dev/null
 # Create session with just Claude
 tmux new-session -d -s claude-writer "$CLAUDE_PANE_SH"
 
-# Enable mouse scrolling and increase scrollback
+# Enable scrolling
 tmux set-option -t claude-writer mouse on
 tmux set-option -t claude-writer history-limit 10000
+tmux set-option -t claude-writer terminal-overrides 'xterm*:smcup@:rmcup@'
 
 # Configure status bar as the menu (bottom of screen - away from Claude's logo)
 tmux set-option -t claude-writer status on
