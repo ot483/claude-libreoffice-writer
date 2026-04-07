@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.oxt
+*.log
+.claude/
+.mcp.json

@@ -1,0 +1,3 @@
+Claude Writer - AI-powered document editing.
+Press the Claude button in the toolbar to start chatting about your document.
+Claude can read, edit, style, and comment on your document through natural language.
