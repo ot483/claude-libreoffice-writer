@@ -1,4 +1,4 @@
-"""Comment/annotation tools - read, add, reply, delete, and process @claude commands."""
+"""Comment/annotation tools - read, add, reply, edit, delete, and process @claude commands."""
 
 import json
 import datetime
@@ -21,6 +21,32 @@ def _get_annotations(doc):
     return annotations
 
 
+def _get_anchor_range(field):
+    """Get the anchor start/end positions for a comment."""
+    try:
+        anchor = field.getAnchor()
+        if anchor:
+            return anchor.getString(), anchor.getStart(), anchor.getEnd()
+    except Exception:
+        pass
+    return "", None, None
+
+
+def _ranges_overlap(start1, end1, start2, end2):
+    """Check if two text ranges overlap or are adjacent."""
+    if start1 is None or start2 is None:
+        return False
+    try:
+        text = start1.getText()
+        # Compare positions: returns -1, 0, or 1
+        s1_before_e2 = text.compareRegionStarts(start1, end2)
+        s2_before_e1 = text.compareRegionStarts(start2, end1)
+        # Overlapping if s1 <= e2 and s2 <= e1
+        return s1_before_e2 >= 0 and s2_before_e1 >= 0
+    except Exception:
+        return False
+
+
 def _get_paragraphs(doc):
     """Enumerate all paragraphs."""
     text = doc.getText()
@@ -33,10 +59,49 @@ def _get_paragraphs(doc):
     return paragraphs
 
 
+def _field_to_comment(idx, field):
+    """Extract comment data from an annotation field."""
+    author = ""
+    content = ""
+    date_str = ""
+    anchor_text = ""
+
+    try:
+        author = field.getPropertyValue("Author")
+    except Exception:
+        pass
+    try:
+        content = field.getPropertyValue("Content")
+    except Exception:
+        pass
+    try:
+        dt = field.getPropertyValue("DateTimeValue")
+        date_str = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}".format(
+            dt.Year, dt.Month, dt.Day, dt.Hours, dt.Minutes
+        )
+    except Exception:
+        pass
+    try:
+        anchor = field.getAnchor()
+        if anchor:
+            anchor_text = anchor.getString()
+    except Exception:
+        pass
+
+    return {
+        "index": idx,
+        "author": author,
+        "date": date_str,
+        "text": content,
+        "anchor_text": anchor_text[:200],
+    }
+
+
 @tool(
     "get_comments",
     "List all comments (annotations) in the document. Returns author, date, text, "
-    "and the text the comment is anchored to. Use filter_author to filter by author name.",
+    "anchor text, and any replies. Replies are separate comments anchored to the "
+    "same text range with 'Re ' prefix. Use filter_author to filter by author name.",
     {
         "filter_author": {
             "type": "string",
@@ -50,49 +115,49 @@ def get_comments(args):
     doc = UnoConnection.get().get_document()
     annotations = _get_annotations(doc)
 
-    comments = []
+    # Build all comment objects
+    all_comments = []
     for idx, field in annotations:
-        author = ""
-        content = ""
-        date_str = ""
-        anchor_text = ""
+        all_comments.append((idx, field, _field_to_comment(idx, field)))
 
-        try:
-            author = field.getPropertyValue("Author")
-        except Exception:
-            pass
-        try:
-            content = field.getPropertyValue("Content")
-        except Exception:
-            pass
-        try:
-            dt = field.getPropertyValue("DateTimeValue")
-            date_str = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}".format(
-                dt.Year, dt.Month, dt.Day, dt.Hours, dt.Minutes
-            )
-        except Exception:
-            pass
-        try:
-            anchor = field.getAnchor()
-            if anchor:
-                anchor_text = anchor.getString()
-        except Exception:
-            pass
+    # Identify replies (text starts with "Re ") and group them with parents
+    parents = []
+    reply_map = {}  # parent_idx -> [reply comments]
 
-        if filter_author and author.lower() != filter_author.lower():
-            continue
+    for idx, field, comment in all_comments:
+        if comment["text"].startswith("Re "):
+            # This is a reply - find its parent by matching anchor range
+            _, reply_start, reply_end = _get_anchor_range(field)
+            matched_parent = None
+            for pidx, pfield, pcomment in all_comments:
+                if pcomment["text"].startswith("Re "):
+                    continue
+                _, pstart, pend = _get_anchor_range(pfield)
+                if _ranges_overlap(reply_start, reply_end, pstart, pend):
+                    matched_parent = pidx
+                    break
+            if matched_parent is not None:
+                if matched_parent not in reply_map:
+                    reply_map[matched_parent] = []
+                reply_map[matched_parent].append(comment)
+            else:
+                # No parent found, treat as standalone comment
+                parents.append(comment)
+        else:
+            parents.append(comment)
 
-        comments.append({
-            "index": idx,
-            "author": author,
-            "date": date_str,
-            "text": content,
-            "anchor_text": anchor_text[:200],  # Truncate long anchors
-        })
+    # Attach replies to parents
+    for comment in parents:
+        comment["replies"] = reply_map.get(comment["index"], [])
+
+    # Apply author filter
+    if filter_author:
+        parents = [c for c in parents
+                   if c["author"].lower() == filter_author.lower()]
 
     return {
-        "count": len(comments),
-        "comments": comments,
+        "count": len(parents),
+        "comments": parents,
     }
 
 
@@ -182,8 +247,8 @@ def add_comment(args):
 
 @tool(
     "reply_to_comment",
-    "Reply to an existing comment by appending text to it. "
-    "(LibreOffice 6.4 does not support threaded replies, so replies are appended.)",
+    "Reply to an existing comment by creating a new comment anchored to the same text. "
+    "The reply is a separate annotation with the original author referenced in the text.",
     {
         "comment_index": {
             "type": "integer",
@@ -191,7 +256,7 @@ def add_comment(args):
         },
         "text": {
             "type": "string",
-            "description": "Reply text",
+            "description": "Reply text (will be prefixed with 'Re [author]: ')",
         },
         "author": {
             "type": "string",
@@ -219,17 +284,97 @@ def reply_to_comment(args):
     if target is None:
         return {"error": "Comment index {} not found".format(comment_idx)}
 
-    # Append reply to existing content
-    current_content = target.getPropertyValue("Content")
-    separator = "\n\n--- Reply by {} ---\n".format(author)
-    new_content = current_content + separator + reply_text
-    target.setPropertyValue("Content", new_content)
+    # Get original comment info
+    original_author = ""
+    try:
+        original_author = target.getPropertyValue("Author")
+    except Exception:
+        pass
+
+    # Get the anchor position of the original comment
+    try:
+        anchor = target.getAnchor()
+        anchor_range = anchor.getEnd()
+    except Exception:
+        return {"error": "Could not get anchor position of comment {}".format(comment_idx)}
+
+    # Create a new annotation as the reply
+    reply_content = "Re {}: {}".format(original_author, reply_text)
+
+    annotation = doc.createInstance("com.sun.star.text.textfield.Annotation")
+    annotation.setPropertyValue("Author", author)
+    annotation.setPropertyValue("Content", reply_content)
+
+    now = datetime.datetime.now()
+    date_struct = uno.createUnoStruct("com.sun.star.util.DateTime")
+    date_struct.Year = now.year
+    date_struct.Month = now.month
+    date_struct.Day = now.day
+    date_struct.Hours = now.hour
+    date_struct.Minutes = now.minute
+    date_struct.Seconds = now.second
+    annotation.setPropertyValue("DateTimeValue", date_struct)
+
+    # Insert at the same anchor position as the original
+    text_obj = doc.getText()
+    cursor = text_obj.createTextCursorByRange(anchor_range)
+    text_obj.insertTextContent(cursor, annotation, False)
 
     return {
         "success": True,
         "comment_index": comment_idx,
         "reply_by": author,
-        "reply_text": reply_text,
+        "reply_to": original_author,
+        "reply_text": reply_content,
+    }
+
+
+@tool(
+    "edit_comment",
+    "Edit the text of an existing comment by index.",
+    {
+        "comment_index": {
+            "type": "integer",
+            "description": "Index of the comment to edit (from get_comments)",
+        },
+        "new_text": {
+            "type": "string",
+            "description": "New comment text",
+        },
+    },
+)
+def edit_comment(args):
+    comment_idx = args.get("comment_index", 0)
+    new_text = args.get("new_text", "")
+
+    if not new_text:
+        return {"error": "new_text parameter is required"}
+
+    doc = UnoConnection.get().get_document()
+    annotations = _get_annotations(doc)
+
+    target = None
+    for idx, field in annotations:
+        if idx == comment_idx:
+            target = field
+            break
+
+    if target is None:
+        return {"error": "Comment index {} not found".format(comment_idx)}
+
+    old_text = ""
+    try:
+        old_text = target.getPropertyValue("Content")
+    except Exception:
+        pass
+
+    target.setPropertyValue("Content", new_text)
+
+    return {
+        "success": True,
+        "comment_index": comment_idx,
+        "old_text": old_text[:100],
+        "new_text": new_text[:100],
     }
 
 
@@ -258,14 +403,12 @@ def delete_comment(args):
     if target is None:
         return {"error": "Comment index {} not found".format(comment_idx)}
 
-    # Get the comment text before deleting for confirmation
     comment_text = ""
     try:
         comment_text = target.getPropertyValue("Content")
     except Exception:
         pass
 
-    # Remove the text field
     doc.getText().removeTextContent(target)
 
     return {
@@ -285,6 +428,16 @@ def delete_comment(args):
 def process_claude_comments(args):
     doc = UnoConnection.get().get_document()
     annotations = _get_annotations(doc)
+
+    # Collect all reply texts to check if a command was already processed
+    reply_texts = set()
+    for idx, field in annotations:
+        try:
+            content = field.getPropertyValue("Content")
+            if content.startswith("Re "):
+                reply_texts.add(content)
+        except Exception:
+            pass
 
     commands = []
     for idx, field in annotations:
@@ -307,14 +460,19 @@ def process_claude_comments(args):
         except Exception:
             pass
 
-        # Check if this is a @claude command (case-insensitive)
         if content.lower().startswith("@claude"):
-            command_text = content[7:].strip()  # Remove "@claude" prefix
+            command_text = content[7:].strip()
             if command_text.startswith(":"):
-                command_text = command_text[1:].strip()  # Remove optional colon
+                command_text = command_text[1:].strip()
 
-            # Skip if already processed (has a reply)
-            if "--- Reply by Claude ---" in content:
+            # Check if already replied to (look for "Re [author]:" in replies)
+            already_processed = False
+            for rt in reply_texts:
+                if "Re {}:".format(author) in rt or "Re @claude" in rt.lower():
+                    already_processed = True
+                    break
+
+            if already_processed:
                 continue
 
             commands.append({
