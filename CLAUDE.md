@@ -26,6 +26,7 @@ claude-writer/
 │   ├── document_nav.py          # Navigation: sections, save, undo/redo
 │   ├── document_style.py        # Style tools
 │   ├── tables.py                # Table reading
+│   ├── selection.py             # Current text selection
 │   ├── comments.py              # Comment/annotation tools
 │   ├── track_changes.py         # Track changes tools
 │   └── report.py                # Report saving
@@ -40,7 +41,7 @@ claude-writer/
 
 The server uses **newline-delimited JSON-RPC 2.0** over stdio.
 
-## Tools (29)
+## Tools (31)
 
 ### Navigate
 - `list_sections` - List all headings with paragraph ranges
@@ -60,6 +61,9 @@ The server uses **newline-delimited JSON-RPC 2.0** over stdio.
 
 ### Tables
 - `list_tables`, `read_table`
+
+### Selection
+- `get_selection` - Read the user's currently highlighted text
 
 ### Comments
 - `get_comments`, `add_comment`, `reply_to_comment`, `delete_comment`, `process_claude_comments`

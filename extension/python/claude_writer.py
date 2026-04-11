@@ -259,4 +259,122 @@ def _log(msg):
         pass
 
 
-g_exportedScripts = (StartClaude,)
+def AskClaude(*args):
+    """Right-click context menu handler - send selected text to Claude."""
+    try:
+        ctx = XSCRIPTCONTEXT.getComponentContext()
+        doc = XSCRIPTCONTEXT.getDocument()
+    except NameError:
+        return
+
+    # Get selected text
+    controller = doc.getCurrentController()
+    selection = controller.getSelection()
+    if selection is None:
+        _show_message("Claude Writer", "Select some text first, then right-click > Ask Claude.")
+        return
+
+    selected_text = ""
+    try:
+        if hasattr(selection, "getString"):
+            selected_text = selection.getString()
+        elif hasattr(selection, "getCount"):
+            parts = []
+            for i in range(selection.getCount()):
+                parts.append(selection.getByIndex(i).getString())
+            selected_text = "\n".join(parts)
+    except Exception:
+        pass
+
+    if not selected_text:
+        _show_message("Claude Writer", "Select some text first, then right-click > Ask Claude.")
+        return
+
+    # Show input dialog asking what to do
+    instruction = _input_dialog(
+        "Ask Claude",
+        "Selected: \"{}...\"\n\nWhat should Claude do with this text?".format(
+            selected_text[:80]
+        ),
+    )
+
+    if not instruction:
+        return
+
+    # Build the message for Claude
+    message = 'Regarding this text: "{}"\n\nInstruction: {}'.format(
+        selected_text[:500], instruction
+    )
+
+    # Send to tmux Claude session
+    try:
+        # Escape single quotes for tmux
+        safe_message = message.replace("'", "'\\''").replace("\n", " ")
+        subprocess.run(
+            ["tmux", "send-keys", "-t", "claude-writer", safe_message, "Enter"],
+            capture_output=True, timeout=5
+        )
+        _log("Sent to Claude: {}".format(instruction[:100]))
+    except Exception as e:
+        _show_message(
+            "Claude Writer",
+            "Could not send to Claude. Is the Claude Writer terminal open?\n\n"
+            "Click the Claude toolbar button first, then try again.",
+        )
+
+
+def _input_dialog(title, message):
+    """Show an input dialog and return the user's text."""
+    try:
+        ctx = XSCRIPTCONTEXT.getComponentContext()
+        smgr = ctx.ServiceManager
+        toolkit = smgr.createInstanceWithContext("com.sun.star.awt.Toolkit", ctx)
+        parent = XSCRIPTCONTEXT.getDesktop().getCurrentFrame().getContainerWindow()
+
+        # Use InputBox via dispatch or BasicIDE
+        # Simpler: use the built-in input line dialog
+        from com.sun.star.awt.MessageBoxType import QUERYBOX
+        box = toolkit.createMessageBox(parent, QUERYBOX, 3, title, message)
+        # QUERYBOX with buttons=3 gives OK/Cancel
+        # But it doesn't have an input field...
+
+        # Use XInputBoxDialog if available, otherwise fall back to simple approach
+        pass
+    except Exception:
+        pass
+
+    # Fall back to a simple approach using BasicIDE InputBox via dispatch
+    try:
+        ctx = XSCRIPTCONTEXT.getComponentContext()
+        smgr = ctx.ServiceManager
+        script_provider = smgr.createInstanceWithContext(
+            "com.sun.star.script.provider.ScriptProviderForBasic", ctx
+        )
+    except Exception:
+        pass
+
+    # Simplest fallback: write to a temp file and use zenity/kdialog
+    try:
+        result = subprocess.run(
+            ["zenity", "--entry", "--title=" + title, "--text=" + message, "--width=500"],
+            capture_output=True, text=True, timeout=120
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+
+    try:
+        result = subprocess.run(
+            ["kdialog", "--inputbox", message, "--title", title],
+            capture_output=True, text=True, timeout=120
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+
+    return None
+
+
+g_exportedScripts = (StartClaude, AskClaude)

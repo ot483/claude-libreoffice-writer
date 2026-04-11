@@ -56,7 +56,7 @@ tmux set-option -t claude-writer status-style "bg=#2a2a4e,fg=#e0e0f0"
 tmux set-option -t claude-writer status-left-length 150
 tmux set-option -t claude-writer status-right-length 0
 tmux set-option -t claude-writer status-left \
-    " #[fg=#c084fc,bold](◉_◉) Claude Writer#[fg=#666]  │  #[fg=#87ceeb]F1#[fg=#999] Grammar  #[fg=#98fb98]F2#[fg=#999] References  #[fg=#ffd700]F3#[fg=#999] Reviewer  #[fg=#c084fc]F4#[fg=#999] Comments  #[fg=#e0e0f0]F5#[fg=#999] Formatting#[fg=#666]  │  #[fg=#999]Just type below for free chat "
+    " #[fg=#c084fc,bold](◉_◉) Claude Writer#[fg=#666]  │  #[fg=#87ceeb]F1#[fg=#999] Grammar  #[fg=#98fb98]F2#[fg=#999] References  #[fg=#ffd700]F3#[fg=#999] Reviewer  #[fg=#c084fc]F4#[fg=#999] Comments  #[fg=#e0e0f0]F5#[fg=#999] Formatting  #[fg=#ff9966]F6#[fg=#999] Selection#[fg=#666]  │  #[fg=#999]free chat below "
 tmux set-option -t claude-writer status-right ""
 tmux set-option -t claude-writer window-status-format ""
 tmux set-option -t claude-writer window-status-current-format ""
@@ -67,6 +67,7 @@ tmux bind-key -n F2 send-keys "@references Validate all references and citations
 tmux bind-key -n F3 send-keys "@reviewer Review this document as a scientific peer reviewer. Comment on methodology, logic, structure, and clarity." Enter
 tmux bind-key -n F4 send-keys "@comments Process all comments in the document. Analyze, categorize, and present a plan before making changes." Enter
 tmux bind-key -n F5 send-keys "@formatting Check this document for formatting consistency and submission readiness. Report all issues." Enter
+tmux bind-key -n F6 send-keys "Read my current selection in the document (use get_selection) and wait for my instructions about it." Enter
 
 # Attach
 exec tmux attach-session -t claude-writer

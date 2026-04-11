@@ -23,6 +23,7 @@ from tools import track_changes   # noqa: F401
 from tools import report           # noqa: F401
 from tools import document_nav    # noqa: F401
 from tools import tables          # noqa: F401
+from tools import selection       # noqa: F401
 
 
 SERVER_INFO = {

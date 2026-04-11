@@ -179,6 +179,7 @@ cp "$SCRIPT_DIR/tools/track_changes.py" "$MCP_DIR/tools/"
 cp "$SCRIPT_DIR/tools/report.py" "$MCP_DIR/tools/"
 cp "$SCRIPT_DIR/tools/document_nav.py" "$MCP_DIR/tools/"
 cp "$SCRIPT_DIR/tools/tables.py" "$MCP_DIR/tools/"
+cp "$SCRIPT_DIR/tools/selection.py" "$MCP_DIR/tools/"
 ok "Installed MCP server"
 
 # ---------- Create terminal profile (gnome-terminal) ----------

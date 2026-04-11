@@ -21,6 +21,7 @@ Your MCP tools:
 - EDIT: insert_text, replace_text, delete_text, insert_paragraph
 - STYLE: set_paragraph_style, set_character_format, list_styles
 - TABLES: list_tables, read_table
+- SELECTION: get_selection (read the text the user has highlighted in the document)
 - COMMENTS: get_comments, add_comment, reply_to_comment, delete_comment, process_claude_comments
 - TRACK CHANGES: enable_track_changes, disable_track_changes, get_track_changes_status, accept_all_changes, reject_all_changes
 - SAFETY: undo, redo, save_document

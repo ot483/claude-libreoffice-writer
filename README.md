@@ -38,8 +38,15 @@ Press an F-key anytime to run a specialist agent:
 | **F3** | Reviewer | Scientific peer review - adds constructive comments |
 | **F4** | Comments | Reads all comments, categorizes them, proposes a plan, addresses each one, saves a report |
 | **F5** | Formatting | Checks heading hierarchy, font consistency, figure/table numbering |
+| **F6** | Selection | Reads your currently selected text and waits for instructions |
 
 Or just type naturally in the Claude panel below the menu.
+
+### Working with selected text
+
+Select text in your document, then either:
+- Press **F6** in the Claude terminal - Claude reads the selection and asks what to do
+- **Tools > Ask Claude about selection** - a dialog asks for your instruction and sends it to Claude
 
 ### How edits work
 
@@ -55,7 +62,7 @@ Write comments in your document starting with `@claude` to leave instructions:
 
 Then ask Claude to process them or press F4.
 
-## Tools (29)
+## Tools (31)
 
 | Category | Tools |
 |----------|-------|
@@ -66,6 +73,7 @@ Then ask Claude to process them or press F4.
 | **Tables** | `list_tables`, `read_table` |
 | **Comments** | `get_comments`, `add_comment`, `reply_to_comment`, `delete_comment`, `process_claude_comments` |
 | **Track Changes** | `enable_track_changes`, `disable_track_changes`, `get_track_changes_status`, `accept_all_changes`, `reject_all_changes` |
+| **Selection** | `get_selection` |
 | **Safety** | `undo`, `redo`, `save_document` |
 | **Reports** | `save_report` |
 

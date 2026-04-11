@@ -42,5 +42,34 @@
         </prop>
       </node>
     </node>
+    <!-- Ask Claude menu entry under Tools -->
+    <node oor:name="OfficeMenuBarMerging">
+      <node oor:name="com.claude.writer.askmerge" oor:op="replace">
+        <node oor:name="S1" oor:op="replace">
+          <prop oor:name="MergePoint">
+            <value>.uno:ToolsMenu\.uno:MacrosMenu</value>
+          </prop>
+          <prop oor:name="MergeCommand">
+            <value>AddBefore</value>
+          </prop>
+          <prop oor:name="MergeFallback">
+            <value>AddPath</value>
+          </prop>
+          <prop oor:name="MergeContext">
+            <value>com.sun.star.text.TextDocument</value>
+          </prop>
+          <node oor:name="MenuItems">
+            <node oor:name="M1" oor:op="replace">
+              <prop oor:name="URL">
+                <value>vnd.sun.star.script:claude_writer.py$AskClaude?language=Python&amp;location=user</value>
+              </prop>
+              <prop oor:name="Title">
+                <value>Ask Claude about selection</value>
+              </prop>
+            </node>
+          </node>
+        </node>
+      </node>
+    </node>
   </node>
 </oor:component-data>
